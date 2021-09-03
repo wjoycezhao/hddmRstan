@@ -74,7 +74,7 @@ head(data_example)
 
 Scale data when possible:
 ```{r data1}
-data_example$trialNum = data_example$trialNum/200
+data_example$trial_no = data_example$trial_no/200
 head(data_example)
 ```
 
@@ -83,7 +83,7 @@ head(data_example)
 Run model
 --------
 ```{r model1, echo=TRUE,message=FALSE}
-test = 1
+test = 0
 if(test){
   seed = 1
   warmup = 0
@@ -91,8 +91,8 @@ if(test){
   chains = 2
 } else {
   seed = 1
-  warmup = 500
-  iter = 1000
+  warmup = 400
+  iter = 700
   chains = 4
 }
 
@@ -102,7 +102,7 @@ stan_data_hddm = runModel(
   ## file_name = 'data_sample.csv', 
   a_coef = 'Intercept',
   t_coef = 'Intercept',
-  z_coef = c('Intercept', 'trialNum'),
+  z_coef = c('Intercept', 'trial_no'),
   v_coef = c('Intercept', 'gain', 'loss'),
   seed = seed,
   warmup = warmup,

@@ -39,7 +39,7 @@ require(hddmRstan)
 unique(data_example$subj_idx) 
 #> [1] 1 2 3 4 5 6 7 8
 head(data_example)
-#>   subj_idx response       rt trialNum gain loss
+#>   subj_idx response       rt trial_no gain loss
 #> 1        1        1 8.310281        1  0.7 -0.6
 #> 2        1        1 0.798285        2  0.6 -0.3
 #> 3        1        0 1.017669        3  0.3 -1.0
@@ -51,9 +51,9 @@ head(data_example)
 Scale data when possible:
 
 ``` r
-data_example$trialNum = data_example$trialNum/200
+data_example$trial_no = data_example$trial_no/200
 head(data_example)
-#>   subj_idx response       rt trialNum gain loss
+#>   subj_idx response       rt trial_no gain loss
 #> 1        1        1 8.310281    0.005  0.7 -0.6
 #> 2        1        1 0.798285    0.010  0.6 -0.3
 #> 3        1        0 1.017669    0.015  0.3 -1.0
@@ -65,7 +65,7 @@ head(data_example)
 ## Run model
 
 ``` r
-test = 1
+test = 0
 if(test){
   seed = 1
   warmup = 0
@@ -73,8 +73,8 @@ if(test){
   chains = 2
 } else {
   seed = 1
-  warmup = 500
-  iter = 1000
+  warmup = 400
+  iter = 700
   chains = 4
 }
 
@@ -84,27 +84,23 @@ stan_data_hddm = runModel(
   ## file_name = 'data_sample.csv', 
   a_coef = 'Intercept',
   t_coef = 'Intercept',
-  z_coef = c('Intercept', 'trialNum'),
+  z_coef = c('Intercept', 'trial_no'),
   v_coef = c('Intercept', 'gain', 'loss'),
-  refresh = 2,
   seed = seed,
   warmup = warmup,
   iter = iter,
+  refresh = iter/10,
   chains = chains,
   csv_name_para = NULL,
   csv_name_diag = NULL
 )
-#> [1] "Range of RT: [0.400293, 9.482172]"
-#> Warning: There were 20 divergent transitions after warmup. See
-#> http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup
-#> to find out why this is a problem and how to eliminate them.
-#> Warning: Examine the pairs() plot to diagnose sampling problems
-#> Warning: The largest R-hat is NA, indicating chains have not mixed.
-#> Running the chains for more iterations may help. See
-#> http://mc-stan.org/misc/warnings.html#r-hat
+#> [1] "Range of RT: [0.408558, 9.482172]"
 #> Warning: Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
 #> Running the chains for more iterations may help. See
 #> http://mc-stan.org/misc/warnings.html#bulk-ess
+#> Warning: Tail Effective Samples Size (ESS) is too low, indicating posterior variances and tail quantiles may be unreliable.
+#> Running the chains for more iterations may help. See
+#> http://mc-stan.org/misc/warnings.html#tail-ess
 ```
 
 ## Details about the runModel function
@@ -141,8 +137,8 @@ runModel(
   data = NULL,
   a_coef = "Intercept",
   t_coef = "Intercept",
-  z_coef = c("Intercept", "context1", "context2"),
-  v_coef = c("Intercept", "highValue", "lowValue", "context1", "context2"),
+  z_coef = "Intercept",
+  v_coef = "Intercept",
   seed = sample(1e+05, 1),
   warmup = warmup,
   iter = iter,
@@ -230,7 +226,16 @@ Coefficients for DDM drift rate. Default: Intercept.
 </td>
 <td>
 <p>
-Seed number
+The seed for random number generation. The default is generated from 1
+to the maximum integer supported by <span
+style="font-family: Courier New, Courier; color: #666666;"><b>R</b></span>
+on the machine. Even if multiple chains are used, only one seed is
+needed, with other chains having seeds derived from that of the first
+chain to avoid dependent samples. When a seed is specified by a number,
+<code>as.integer</code> will be applied to it. If
+<code>as.integer</code> produces <code>NA</code>, the seed is generated
+randomly. The seed can also be specified as a character string of
+digits, such as <code>“12345”</code>, which is converted to integer.
 </p>
 </td>
 </tr>
@@ -240,7 +245,12 @@ Seed number
 </td>
 <td>
 <p>
-Warm-up or burn-in number. Default 0.
+A positive integer specifying the number of warmup (aka burnin)
+iterations per chain. If step-size adaptation is on (which it is by
+default), this also controls the number of iterations for which
+adaptation is run (and hence these warmup samples should not be used for
+inference). The number of warmup iterations should be smaller than
+<code>iter</code> and the default is <code>iter/2</code>.
 </p>
 </td>
 </tr>
@@ -250,7 +260,8 @@ Warm-up or burn-in number. Default 0.
 </td>
 <td>
 <p>
-Iteration number. Default 10.
+A positive integer specifying the number of iterations for each chain
+(including warmup). The default is 2000.
 </p>
 </td>
 </tr>
@@ -260,7 +271,8 @@ Iteration number. Default 10.
 </td>
 <td>
 <p>
-Chain number. Default 1.
+A positive integer specifying the number of Markov chains. The default
+is 4.
 </p>
 </td>
 </tr>
@@ -270,13 +282,16 @@ Chain number. Default 1.
 </td>
 <td>
 <p>
-Number of cores to be used. Default = chain number.
+Number of cores to use when executing the chains in parallel, which
+defaults to 1 but we recommend setting the <code>mc.cores</code> option
+to be as many processors as the hardware and RAM allow (up to the number
+of chains).
 </p>
 </td>
 </tr>
 <tr valign="top">
 <td>
-<code>sample\_file</code>
+<code>csv\_name\_para</code>
 </td>
 <td>
 <p>
@@ -286,11 +301,26 @@ Save model details
 </tr>
 <tr valign="top">
 <td>
-<code>init\_r</code>
+<code>csv\_name\_diag</code>
 </td>
 <td>
 <p>
-Default 1.
+Save model details
+</p>
+</td>
+</tr>
+<tr valign="top">
+<td>
+<code>sample\_file</code>
+</td>
+<td>
+<p>
+An optional character string providing the name of a file. If specified
+the draws for <em>all</em> parameters and other saved quantities will be
+written to the file. If not provided, files are not created. When the
+folder specified is not writable, <code>tempdir()</code> is used. When
+there are multiple chains, an underscore and chain number are appended
+to the file name prior to the <code>.csv</code> extension.
 </p>
 </td>
 </tr>
@@ -300,7 +330,7 @@ Default 1.
 </td>
 <td>
 <p>
-Default 500
+Show progress. Default 500
 </p>
 </td>
 </tr>
@@ -356,121 +386,121 @@ Show model diagnostics
 
 ``` r
 stan_data_hddm$diag
-#>     waic   p_waic      lppd p_waic_1 elapsed_time_min elapsed_time_max rhat_max
-#> 1 817899 398747.1 -10202.41 22957.19          0.04241          0.04648      Inf
-#>    ess_min divergent max_tree
-#> 1 1.052632        20        0
+#>       waic  p_waic      lppd p_waic_1 elapsed_time_min elapsed_time_max
+#> 1 789.9547 43.2236 -351.7538 36.95766         235.7804         329.2083
+#>   rhat_max  ess_min divergent max_tree
+#> 1 1.012487 243.1025         0        0
 ```
 
 Show posteror distribution summary
 
 ``` r
 stan_data_hddm$para[,c(1:3,13)]
-#>                            mean       median        2.5%       97.5%
-#> a_Intercept_mu     -0.112511065 -0.112511065 -0.19238189 -0.03264025
-#> a_Intercept_sd      1.029210232  1.029210232  1.00296342  1.05545705
-#> a_Intercept_subj.1  0.183270561  0.183270561 -0.06791412  0.43445524
-#> a_Intercept_subj.2 -0.855641021 -0.855641021 -1.01376575 -0.69751629
-#> a_Intercept_subj.3 -0.622758255 -0.622758255 -0.99214914 -0.25336737
-#> a_Intercept_subj.4 -0.400704488 -0.400704488 -0.70241837 -0.09899061
-#> a_Intercept_subj.5 -0.136689155 -0.136689155 -0.25613766 -0.01724065
-#> a_Intercept_subj.6 -0.027169181 -0.027169181 -0.14237262  0.08803426
-#> a_Intercept_subj.7 -0.022397114 -0.022397114 -0.55508402  0.51028979
-#> a_Intercept_subj.8 -0.403486737 -0.403486737 -1.00115138  0.19417790
-#> t_Intercept_mu     -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> t_Intercept_sd      0.901499248  0.901499248  0.41212100  1.39087750
-#> t_Intercept_subj.1 -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> t_Intercept_subj.2 -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> t_Intercept_subj.3 -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> t_Intercept_subj.4 -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> t_Intercept_subj.5 -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> t_Intercept_subj.6 -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> t_Intercept_subj.7 -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> t_Intercept_subj.8 -1.608705681 -1.608705681 -1.60870568 -1.60870568
-#> v_Intercept_mu      0.086162960  0.086162960 -0.21569213  0.38801805
-#> v_gain_mu           0.147793766  0.147793766 -0.58535157  0.88093910
-#> v_loss_mu          -0.203294509 -0.203294509 -0.33176072 -0.07482830
-#> v_Intercept_sd      0.976060088  0.976060088  0.89216824  1.05995193
-#> v_gain_sd           0.570641924  0.570641924  0.46237253  0.67891132
-#> v_loss_sd           1.137344632  1.137344632  0.96867056  1.30601870
-#> v_Intercept_subj.1 -0.450638588 -0.450638588 -1.08072500  0.17944782
-#> v_Intercept_subj.2 -0.434263357 -0.434263357 -1.00285962  0.13433291
-#> v_Intercept_subj.3 -0.054206614 -0.054206614 -0.53224507  0.42383184
-#> v_Intercept_subj.4  0.427643607  0.427643607  0.37097311  0.48431410
-#> v_Intercept_subj.5  0.187669428  0.187669428  0.04997798  0.32536087
-#> v_Intercept_subj.6  0.417847393  0.417847393 -0.58516428  1.42085907
-#> v_Intercept_subj.7 -0.350462126 -0.350462126 -0.59795674 -0.10296751
-#> v_Intercept_subj.8 -0.009930908 -0.009930908 -0.41501646  0.39515464
-#> v_gain_subj.1       0.427765256  0.427765256 -0.23038211  1.08591262
-#> v_gain_subj.2      -0.100076159 -0.100076159 -0.84159130  0.64143898
-#> v_gain_subj.3       0.106327069  0.106327069 -0.37514213  0.58779627
-#> v_gain_subj.4       0.006201073  0.006201073 -1.09942831  1.11183046
-#> v_gain_subj.5      -0.171992317 -0.171992317 -1.04560575  0.70162112
-#> v_gain_subj.6       0.352624518  0.352624518 -0.45580846  1.16105750
-#> v_gain_subj.7      -0.023575220 -0.023575220 -0.78378529  0.73663485
-#> v_gain_subj.8       0.273172263  0.273172263 -0.12142130  0.66776583
-#> v_loss_subj.1       0.440051612  0.440051612 -0.06200499  0.94210821
-#> v_loss_subj.2      -0.488906314 -0.488906314 -1.01262931  0.03481668
-#> v_loss_subj.3      -0.120293040 -0.120293040 -0.24162372  0.00103764
-#> v_loss_subj.4       0.241147128  0.241147128  0.02796946  0.45432480
-#> v_loss_subj.5      -1.005829074 -1.005829074 -1.55478649 -0.45687165
-#> v_loss_subj.6       0.591079616  0.591079616  0.32631857  0.85584066
-#> v_loss_subj.7       0.053845456  0.053845456 -0.60048568  0.70817660
-#> v_loss_subj.8      -0.999325474 -0.999325474 -1.41819020 -0.58046075
-#> z_Intercept_mu     -0.327309975 -0.327309975 -0.75189455  0.09727460
-#> z_trialNum_mu       0.038067263  0.038067263 -0.81232168  0.88845620
-#> z_Intercept_sd      0.607174990  0.607174990  0.51457274  0.69977724
-#> z_trialNum_sd       0.718400391  0.718400391  0.70992814  0.72687264
-#> z_Intercept_subj.1 -0.401715318 -0.401715318 -0.49914027 -0.30429036
-#> z_Intercept_subj.2  0.105877036  0.105877036 -0.39906358  0.61081766
-#> z_Intercept_subj.3 -0.239112394 -0.239112394 -0.35298678 -0.12523801
-#> z_Intercept_subj.4 -0.759314330 -0.759314330 -1.41060955 -0.10801911
-#> z_Intercept_subj.5  0.061811057  0.061811057 -0.21448079  0.33810290
-#> z_Intercept_subj.6 -0.240403445 -0.240403445 -0.92613649  0.44532960
-#> z_Intercept_subj.7  0.122130046  0.122130046 -0.21997323  0.46423333
-#> z_Intercept_subj.8 -0.435277852 -0.435277852 -0.94919109  0.07863539
-#> z_trialNum_subj.1  -0.056457466 -0.056457466 -0.64558207  0.53266714
-#> z_trialNum_subj.2  -0.051759827 -0.051759827 -0.87956129  0.77604164
-#> z_trialNum_subj.3   0.125460851  0.125460851 -0.30812384  0.55904554
-#> z_trialNum_subj.4   0.090325364  0.090325364 -1.38267349  1.56332422
-#> z_trialNum_subj.5  -0.289958118 -0.289958118 -1.42053565  0.84061941
-#> z_trialNum_subj.6   0.400922998  0.400922998 -0.65065173  1.45249772
-#> z_trialNum_subj.7  -0.058015876 -0.058015876 -1.28857030  1.17253854
-#> z_trialNum_subj.8   0.191857503  0.191857503 -0.48854363  0.87225863
-#> a_mean_grand        0.839066479  0.839066479  0.77470208  0.90343088
-#> t_mean_grand        0.200146500  0.200146500  0.20014650  0.20014650
-#> v_mean_grand        0.114059192  0.114059192 -0.67209025  0.90020863
-#> z_mean_grand        0.455006385  0.455006385  0.44213150  0.46788127
-#> a_mean_subj.1       1.239231184  1.239231184  0.93434071  1.54412166
-#> a_mean_subj.2       0.430335105  0.430335105  0.36285000  0.49782021
-#> a_mean_subj.3       0.573480831  0.573480831  0.37077898  0.77618269
-#> a_mean_subj.4       0.700568522  0.700568522  0.49538583  0.90575122
-#> a_mean_subj.5       0.878471264  0.878471264  0.77403541  0.98290712
-#> a_mean_subj.6       0.979661777  0.979661777  0.86729802  1.09202553
-#> a_mean_subj.7       1.119898942  1.119898942  0.57402403  1.66577385
-#> a_mean_subj.8       0.790884206  0.790884206  0.36745612  1.21431229
-#> t_mean_subj.1       0.200146500  0.200146500  0.20014650  0.20014650
-#> t_mean_subj.2       0.200146500  0.200146500  0.20014650  0.20014650
-#> t_mean_subj.3       0.200146500  0.200146500  0.20014650  0.20014650
-#> t_mean_subj.4       0.200146500  0.200146500  0.20014650  0.20014650
-#> t_mean_subj.5       0.200146500  0.200146500  0.20014650  0.20014650
-#> t_mean_subj.6       0.200146500  0.200146500  0.20014650  0.20014650
-#> t_mean_subj.7       0.200146500  0.200146500  0.20014650  0.20014650
-#> t_mean_subj.8       0.200146500  0.200146500  0.20014650  0.20014650
-#> v_mean_subj.1      -0.457396084 -0.457396084 -1.72559468  0.81080251
-#> v_mean_subj.2      -0.220406772 -0.220406772 -0.90878871  0.46797517
-#> v_mean_subj.3       0.070155991  0.070155991 -0.60229452  0.74260650
-#> v_mean_subj.4       0.298423277  0.298423277 -0.37025011  0.96709666
-#> v_mean_subj.5       0.639072553  0.639072553  0.63472815  0.64341695
-#> v_mean_subj.6       0.284099166  0.284099166 -1.30957396  1.87777229
-#> v_mean_subj.7      -0.391417442 -0.391417442 -1.39315459  0.61031971
-#> v_mean_subj.8       0.689942847  0.689942847  0.29820643  1.08167926
-#> z_mean_subj.1       0.395858357  0.395858357  0.34899476  0.44272195
-#> z_mean_subj.2       0.519600405  0.519600405  0.49775248  0.54144833
-#> z_mean_subj.3       0.457711777  0.457711777  0.37494693  0.54047662
-#> z_mean_subj.4       0.335481306  0.335481306  0.31567719  0.35528542
-#> z_mean_subj.5       0.498745161  0.498745161  0.49553765  0.50195267
-#> z_mean_subj.6       0.491970665  0.491970665  0.45599335  0.52794798
-#> z_mean_subj.7       0.522983664  0.522983664  0.46749778  0.57846955
-#> z_mean_subj.8       0.417699746  0.417699746  0.37681313  0.45858636
+#>                           mean      median         2.5%        97.5%
+#> a_Intercept_mu      1.04597701  1.04451512  0.886010572  1.207147712
+#> a_Intercept_sd      0.16703304  0.15177215  0.038417042  0.377418625
+#> a_Intercept_subj.1  1.04291794  1.04187802  0.915524070  1.173359219
+#> a_Intercept_subj.2  0.92247933  0.92269316  0.723954434  1.113764290
+#> a_Intercept_subj.3  1.22636571  1.22592918  1.055754350  1.383904517
+#> a_Intercept_subj.4  1.14349358  1.14023035  0.957923053  1.347553684
+#> a_Intercept_subj.5  1.05162996  1.04380764  0.780138538  1.350557314
+#> a_Intercept_subj.6  1.06714844  1.06077849  0.845180369  1.326023066
+#> a_Intercept_subj.7  1.03116344  1.03132830  0.848215432  1.237014294
+#> a_Intercept_subj.8  0.93377052  0.93424366  0.780982231  1.094884734
+#> t_Intercept_mu     -0.88645787 -0.89801018 -1.054661918 -0.687360680
+#> t_Intercept_sd      0.18996470  0.18240982  0.015896051  0.435536679
+#> t_Intercept_subj.1 -0.90542738 -0.90610870 -1.189957737 -0.656853128
+#> t_Intercept_subj.2 -0.89138994 -0.88289619 -1.052638360 -0.782226862
+#> t_Intercept_subj.3 -0.86404872 -0.87814120 -1.214988444 -0.539698678
+#> t_Intercept_subj.4 -0.59644253 -0.53370011 -0.981335377 -0.272763020
+#> t_Intercept_subj.5 -0.98572146 -0.97374834 -1.125342435 -0.918360984
+#> t_Intercept_subj.6 -0.88830904 -0.87768455 -1.056494275 -0.786341472
+#> t_Intercept_subj.7 -0.98928584 -0.98028790 -1.104063745 -0.930235449
+#> t_Intercept_subj.8 -0.96460784 -0.95180308 -1.175097459 -0.835675431
+#> v_Intercept_mu     -0.10412039 -0.09557776 -0.576596638  0.273655245
+#> v_gain_mu           1.30646713  1.31539512  0.232088612  2.328546320
+#> v_loss_mu           1.99417166  2.01698161  1.026372130  2.758894955
+#> v_Intercept_sd      0.35586448  0.32565889  0.011619322  0.909468879
+#> v_gain_sd           1.50328548  1.45525881  0.875352582  2.342184892
+#> v_loss_sd           1.01966072  0.98619847  0.353503965  1.891024509
+#> v_Intercept_subj.1  0.02245431  0.01007487 -0.426561766  0.518297326
+#> v_Intercept_subj.2 -0.21959484 -0.17510559 -0.946592160  0.351269214
+#> v_Intercept_subj.3  0.10493091  0.09160959 -0.335370672  0.594123804
+#> v_Intercept_subj.4  0.07696457  0.04776566 -0.413447947  0.677783092
+#> v_Intercept_subj.5 -0.05744154 -0.05506386 -0.732897083  0.582140172
+#> v_Intercept_subj.6 -0.37627943 -0.29767420 -1.290523818  0.255051991
+#> v_Intercept_subj.7 -0.05259654 -0.04998055 -0.689141791  0.552431512
+#> v_Intercept_subj.8 -0.38168551 -0.31434808 -1.245374856  0.237642170
+#> v_gain_subj.1       2.02267269  2.03323961  1.310971793  2.689857487
+#> v_gain_subj.2       2.06821019  2.06490843  1.019047757  3.129642293
+#> v_gain_subj.3       0.65098368  0.65677991 -0.059890615  1.360884073
+#> v_gain_subj.4       2.68736184  2.68170500  1.828995403  3.610955715
+#> v_gain_subj.5       0.02611516  0.03620807 -1.325847938  1.347146500
+#> v_gain_subj.6       0.44215641  0.41701478 -0.486836853  1.494850117
+#> v_gain_subj.7       0.94617450  0.94241425 -0.003935377  1.938538536
+#> v_gain_subj.8       4.41322226  4.38573157  3.169888871  5.813234322
+#> v_loss_subj.1       2.06362698  2.07386814  1.339594157  2.840631352
+#> v_loss_subj.2       3.00893910  3.00296633  1.948090400  4.052543131
+#> v_loss_subj.3       1.82621288  1.82344780  1.111888599  2.598416087
+#> v_loss_subj.4       2.52421711  2.51677919  1.755173919  3.395907814
+#> v_loss_subj.5       2.67445075  2.63692941  1.300308746  4.180642141
+#> v_loss_subj.6       1.20857044  1.21418602  0.262568209  2.103828152
+#> v_loss_subj.7       1.39769222  1.40249275  0.506236197  2.228230696
+#> v_loss_subj.8       3.54458458  3.54327407  2.207909090  4.882321647
+#> z_Intercept_mu     -0.52211779 -0.52316001 -1.030544091  0.017588783
+#> z_trial_no_mu      -0.19422249 -0.16616661 -1.643688378  1.291100313
+#> z_Intercept_sd      0.68599989  0.64958320  0.313761564  1.244396875
+#> z_trial_no_sd       2.19967244  2.22249411  0.855954722  3.391685389
+#> z_Intercept_subj.1 -0.49641107 -0.49494839 -1.003912439 -0.004727308
+#> z_Intercept_subj.2 -0.38226531 -0.38829963 -0.952164881  0.219178132
+#> z_Intercept_subj.3  0.12376895  0.12279608 -0.441223758  0.724523308
+#> z_Intercept_subj.4 -0.26795172 -0.26360142 -0.803099599  0.275985401
+#> z_Intercept_subj.5 -1.16418720 -1.15958214 -1.932211861 -0.480588721
+#> z_Intercept_subj.6 -0.82993816 -0.83368310 -1.449634826 -0.223171096
+#> z_Intercept_subj.7 -1.33384626 -1.33269898 -1.909825779 -0.794241448
+#> z_Intercept_subj.8  0.02116770  0.01116037 -0.567948432  0.605445026
+#> z_trial_no_subj.1   2.39012641  2.38985614 -0.700473080  5.803140520
+#> z_trial_no_subj.2  -1.12293042 -1.08995798 -4.056072831  1.668984209
+#> z_trial_no_subj.3  -1.04144503 -0.99869007 -4.298494600  2.181243947
+#> z_trial_no_subj.4   1.63972871  1.64173548 -1.451338744  4.991634509
+#> z_trial_no_subj.5  -3.79984879 -3.84445425 -7.851187130 -0.186357798
+#> z_trial_no_subj.6  -2.30706476 -2.27449143 -5.375272284  0.474198697
+#> z_trial_no_subj.7  -1.32637753 -1.26775543 -4.079063587  1.417851566
+#> z_trial_no_subj.8   3.01847705  2.99306646 -0.317010436  6.561363084
+#> a_mean_grand        2.89216307  2.88464017  2.661261124  3.170439106
+#> t_mean_grand        0.41899268  0.41900293  0.376970830  0.462896011
+#> v_mean_grand       -0.45626179 -0.45576113 -0.614451858 -0.300145537
+#> z_mean_grand        0.37762442  0.37705981  0.345687112  0.412645434
+#> a_mean_subj.1       2.84389504  2.83453534  2.498084081  3.232834217
+#> a_mean_subj.2       2.52779754  2.51605743  2.062573484  3.045802126
+#> a_mean_subj.3       3.41996037  3.40733065  2.874142490  3.990452041
+#> a_mean_subj.4       3.15443605  3.12748874  2.606277762  3.848000739
+#> a_mean_subj.5       2.89245865  2.84001020  2.181775720  3.859575945
+#> a_mean_subj.6       2.92916185  2.88861895  2.328397757  3.766036478
+#> a_mean_subj.7       2.81734988  2.80478897  2.335475369  3.445311477
+#> a_mean_subj.8       2.55224516  2.54528762  2.183616036  2.988838218
+#> t_mean_subj.1       0.40796018  0.40409362  0.304234244  0.518480585
+#> t_mean_subj.2       0.41111225  0.41358336  0.349015731  0.457386341
+#> t_mean_subj.3       0.42734084  0.41555463  0.296713839  0.582923887
+#> t_mean_subj.4       0.56474023  0.58643111  0.374810251  0.761273173
+#> t_mean_subj.5       0.37369273  0.37766477  0.324541315  0.399172756
+#> t_mean_subj.6       0.41233721  0.41574444  0.347672521  0.455508243
+#> t_mean_subj.7       0.37223247  0.37520307  0.331521127  0.394460824
+#> t_mean_subj.8       0.38252551  0.38604433  0.308788908  0.433581528
+#> v_mean_subj.1       0.04112008  0.04114540 -0.199120085  0.298941691
+#> v_mean_subj.2      -0.91187378 -0.91008172 -1.354449159 -0.480237219
+#> v_mean_subj.3      -0.46345008 -0.46142894 -0.705719031 -0.232813596
+#> v_mean_subj.4       0.33459766  0.33365074  0.046589570  0.639572697
+#> v_mean_subj.5      -1.46600202 -1.46659832 -2.203382962 -0.717543583
+#> v_mean_subj.6      -0.74592704 -0.74013529 -1.169692025 -0.356429049
+#> v_mean_subj.7      -0.31138553 -0.30847262 -0.676816928  0.048392316
+#> v_mean_subj.8      -0.12717358 -0.12806729 -0.499392214  0.218301812
+#> z_mean_subj.1       0.45301784  0.45235023  0.374653726  0.537407907
+#> z_mean_subj.2       0.37378867  0.37023559  0.269813636  0.485964637
+#> z_mean_subj.3       0.49553007  0.49335880  0.402806118  0.596182102
+#> z_mean_subj.4       0.48550057  0.48610694  0.385260942  0.589931241
+#> z_mean_subj.5       0.18359065  0.18035098  0.107911842  0.285378987
+#> z_mean_subj.6       0.24684004  0.24267596  0.163181577  0.352406233
+#> z_mean_subj.7       0.18485708  0.18166242  0.127933325  0.255344356
+#> z_mean_subj.8       0.59787040  0.59985420  0.502747630  0.682335220
 ```
