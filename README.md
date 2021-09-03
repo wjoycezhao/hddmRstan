@@ -357,7 +357,7 @@ Show model diagnostics
 ``` r
 stan_data_hddm$diag
 #>     waic   p_waic      lppd p_waic_1 elapsed_time_min elapsed_time_max rhat_max
-#> 1 817899 398747.1 -10202.41 22957.19         0.036337         0.039341      Inf
+#> 1 817899 398747.1 -10202.41 22957.19          0.04241          0.04648      Inf
 #>    ess_min divergent max_tree
 #> 1 1.052632        20        0
 ```

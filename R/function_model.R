@@ -6,17 +6,13 @@
 #' @param t_coef Coefficients for DDM non-decision time. Default: Intercept.
 #' @param z_coef Coefficients for DDM starting point. Default: Intercept.
 #' @param v_coef Coefficients for DDM drift rate. Default: Intercept.
-#' @param seed Seed number
-#' @param warmup Warm-up or burn-in number. Default 0.
-#' @param iter Iteration number. Default 10.
-#' @param chains Chain number. Default 1.
-#' @param cores Number of cores to be used. Default = chain number.
-#' @param sample_file Save model details
-#' @param init_r Default 1.
-#' @param refresh Default 500
+#' @param csv_name_para Save model details
+#' @param csv_name_diag Save model details
+#' @param refresh Show progress. Default 500
 #' @param adapt_delta Default 0.99
 #' @param stepsize Default 0.05
 #' @param max_treedepth Default 20
+#' @inheritParams rstan::sampling
 #' @export
 
 runModel = function(file_name =NULL,
@@ -142,7 +138,6 @@ getRstanData = function(file_name =NULL,
 #' @inheritParams getStanFit
 #' @param Q Number of questions
 #' @param S Number of participants
-#' @export
 changeBetaNames = function(names, para, para_coef, S) {
   for (x in 1:length(para_coef)) {
     names = plyr::mapvalues(
